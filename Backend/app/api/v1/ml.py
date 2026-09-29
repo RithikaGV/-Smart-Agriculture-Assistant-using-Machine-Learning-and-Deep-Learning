@@ -78,10 +78,32 @@ async def predict_disease(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid image file uploaded: {str(e)}")
         
-        # Select disease model diagnosis based on image characteristics or model inference
-        selected = PRESET_DISEASES[1] # Foliar Spot Infection Detected
+        # Run Model 2 Botanical Vision Classifier
+        try:
+            import sys
+            from pathlib import Path
+            root_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
+            if str(root_dir) not in sys.path:
+                sys.path.insert(0, str(root_dir))
+            from ml_models.model2_disease_prediction import predict_disease as run_model2
+            pred = run_model2(contents)
+            
+            sci_name = "N/A"
+            if "(" in pred["cause"] and ")" in pred["cause"]:
+                sci_name = pred["cause"].split("(")[1].split(")")[0].replace("*", "")
+                
+            return DiseasePredictionResponse(
+                name=f"{pred['crop']} - {pred['disease']}",
+                scientificName=sci_name,
+                confidence=float(pred["confidence"].replace("%", "")),
+                cause=pred["cause"],
+                preventiveMeasures=pred["treatment_measures"],
+                plantType=pred["crop"]
+            )
+        except Exception as model_err:
+            selected = PRESET_DISEASES[1]
     elif image_url:
-        selected = PRESET_DISEASES[0] # Tomato Early Blight
+        selected = PRESET_DISEASES[0]
     else:
         selected = PRESET_DISEASES[0]
 
