@@ -1,9 +1,0 @@
-{
-  "host": "127.0.0.1",
-  "port": 3306,
-  "user": "root",
-  "password": "root1234",
-  "database": "polyhouse",
-  "http_port": 50503,
-  "bind": "0.0.0.0"
-}
