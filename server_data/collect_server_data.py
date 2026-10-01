@@ -28,6 +28,7 @@ HEALTH_RANGES = (
     ("Temperature", "DHT_temp", 18.0, 26.0, 15.0, 30.0),
     ("Humidity", "DHT_humidity", 50.0, 70.0, 40.0, 80.0),
     ("pH", "pH", 5.5, 6.5, 5.0, 7.0),
+    ("Water level", "water_level", 40.0, 100.0, 20.0, 100.0),
 )
 SOURCE_FIELDS = {
     "DHT_temp": ("DHT_temp", "dht_temp", "temp_avg", "temperature", "temperature1", "temp_hum_1_val1"),
@@ -35,6 +36,12 @@ SOURCE_FIELDS = {
     "DHT_humidity": ("DHT_humidity", "dht_humidity", "humidity_avg", "humidity", "humidity1"),
     "water_level": ("water_level", "waterLevel", "waterlevel"),
     "Health_Status": ("Health_Status", "health_status", "plant_status"),
+}
+BACKEND_SENSOR_FIELDS = {
+    "DHT_temp": ("temperature", "°C"),
+    "pH": ("ph", "pH"),
+    "DHT_humidity": ("humidity", "%"),
+    "water_level": ("waterLevel", "%"),
 }
 
 
@@ -64,6 +71,44 @@ def make_row(data):
     return row
 
 
+def make_backend_payloads(row, plant_id=None, server_url=None):
+    if not plant_id and not server_url:
+        raise ValueError("Backend ingestion requires a plant ID or registered server URL")
+
+    payloads = []
+    for field, (sensor_type, unit) in BACKEND_SENSOR_FIELDS.items():
+        value = row.get(field)
+        try:
+            numeric_value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(numeric_value):
+            continue
+        payload = {
+            "sensor_type": sensor_type,
+            "value": numeric_value,
+            "unit": unit,
+            "extra_data": {"captured_at": row.get("captured_at", "")},
+        }
+        if plant_id:
+            payload["plant_id"] = plant_id
+        else:
+            payload["server_url"] = server_url
+        payloads.append(payload)
+    return payloads
+
+
+def post_backend_reading(backend_url, payload):
+    request = Request(
+        backend_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        response.read()
+
+
 def classify_metric(value, healthy_min, healthy_max, attention_min, attention_max):
     try:
         number = float(value)
@@ -82,12 +127,19 @@ def classify_metric(value, healthy_min, healthy_max, attention_min, attention_ma
 def make_cleaned_row(row):
     cleaned_row = {field: row.get(field, "") for field in CSV_FIELDS}
     reasons = []
+    available_metrics = 0
     for label, field, healthy_min, healthy_max, attention_min, attention_max in HEALTH_RANGES:
-        state = classify_metric(row.get(field), healthy_min, healthy_max, attention_min, attention_max)
+        value = row.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        available_metrics += 1
+        state = classify_metric(value, healthy_min, healthy_max, attention_min, attention_max)
         if state != "Healthy":
             reasons.append(f"{label}: {state}")
 
-    cleaned_row["Health_Status"] = "healthy" if not reasons else "Not healthy"
+    cleaned_row["Health_Status"] = (
+        "Waiting for data" if available_metrics == 0 else "healthy" if not reasons else "Not healthy"
+    )
     cleaned_row["Reason"] = "; ".join(reasons)
     return cleaned_row
 
@@ -120,6 +172,9 @@ def main():
     parser.add_argument("--interval", type=float, default=5, help="Seconds between polls (default: 5)")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="CSV file to append readings to")
     parser.add_argument("--cleaned-output", type=Path, default=DEFAULT_CLEANED_OUTPUT, help="CSV file for classified readings")
+    parser.add_argument("--backend-url", help="Optional full /api/v1/sensors/ingest URL; disables backend ingestion when omitted")
+    parser.add_argument("--plant-id", help="Optional plant ID; normally resolved from the registered source URL")
+    parser.add_argument("--server-url", help="Optional registered server URL to use when resolving a plant without its ID")
     parser.add_argument("--once", action="store_true", help="Collect one reading and exit")
     args = parser.parse_args()
 
@@ -127,6 +182,8 @@ def main():
         parser.error("--interval must be greater than zero")
     if args.output.resolve() == args.cleaned_output.resolve():
         parser.error("--output and --cleaned-output must be different files")
+    if (args.plant_id or args.server_url) and not args.backend_url:
+        parser.error("--plant-id and --server-url require --backend-url")
 
     if args.output == DEFAULT_OUTPUT and not args.output.exists() and LEGACY_OUTPUT.exists():
         shutil.copyfile(LEGACY_OUTPUT, args.output)
@@ -140,6 +197,20 @@ def main():
                 append_row(args.output, row)
                 append_row(args.cleaned_output, make_cleaned_row(row), CLEANED_FIELDS)
                 print(f"Captured {row['captured_at']}", flush=True)
+                if args.backend_url:
+                    for payload in make_backend_payloads(
+                        row,
+                        args.plant_id,
+                        args.server_url or args.url,
+                    ):
+                        try:
+                            post_backend_reading(args.backend_url, payload)
+                        except (OSError, ValueError) as error:
+                            print(
+                                f"Backend ingestion failed for {payload['sensor_type']}: {error}",
+                                file=sys.stderr,
+                                flush=True,
+                            )
             except (OSError, ValueError, json.JSONDecodeError) as error:
                 print(f"Collection failed: {error}", file=sys.stderr, flush=True)
 

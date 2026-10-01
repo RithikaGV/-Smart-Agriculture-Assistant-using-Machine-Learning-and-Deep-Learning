@@ -52,13 +52,18 @@ def apply_remedy(alert_id: str, db: Session = Depends(get_db)):
         if action == "COOLING_AND_REFILL":
             plant.temperature = 24.5
             plant.water_level = 88.0
-            plant.status = "Healthy"
+        elif action == "ADJUST_TEMPERATURE":
+            plant.temperature = 24.5
         elif action == "ADD_ALKALI":
             plant.ph = 6.2
-            plant.status = "Healthy"
+        elif action == "ADD_ACID":
+            plant.ph = 6.2
         elif action == "ACTIVATE_DEHUMIDIFIER":
             plant.humidity = 64.0
-            plant.status = "Healthy"
+        elif action == "ACTIVATE_HUMIDIFIER":
+            plant.humidity = 64.0
+        elif action in ["REFILL_RESERVOIR", "CHECK_WATER_SENSOR"]:
+            plant.water_level = 88.0
         elif action == "RECONNECT_SENSOR":
             sensor = db.query(Sensor).filter(Sensor.plant_id == plant.id, Sensor.sensor_type == "waterLevel").first()
             if sensor:
@@ -67,6 +72,20 @@ def apply_remedy(alert_id: str, db: Session = Depends(get_db)):
                 sensor.status_text = "Connected and battery level good"
 
     alert.resolved = True
+    if plant:
+        db.flush()
+        active_severities = {
+            severity
+            for (severity,) in db.query(Alert.severity)
+            .filter(Alert.plant_id == plant.id, Alert.resolved == False)
+            .all()
+        }
+        if "critical" in active_severities:
+            plant.status = "Critical"
+        elif active_severities:
+            plant.status = "Needs Attention"
+        else:
+            plant.status = "Healthy"
     db.commit()
 
     return {

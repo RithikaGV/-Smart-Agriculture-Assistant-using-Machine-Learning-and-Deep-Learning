@@ -1,15 +1,18 @@
+import logging
 import os
 import json
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.domain import Plant, Sensor, SensorReading, HydroponicSystem, Farm, Grower
+from app.models.domain import Plant, Sensor, SensorReading, HydroponicSystem, Farm, Grower, PlantServerConnection
 from app.schemas.schemas import PlantCreate, PlantUpdate, PlantResponse, PlantMetrics
 from app.api.deps import get_current_grower, require_current_grower
 from app.db.exporter import export_readable_data
+from app.core.plant_collector import create_server_connection, normalize_server_url, plant_collector_manager
 
 router = APIRouter(prefix="/plants", tags=["plants"])
+logger = logging.getLogger(__name__)
 
 def ensure_grower_system(grower: Grower, db: Session) -> HydroponicSystem:
     farm = db.query(Farm).filter(Farm.grower_id == grower.id).first()
@@ -52,7 +55,7 @@ def build_plant_response(p: Plant, db: Session) -> PlantResponse:
         for r in readings:
             day_str = r.timestamp.strftime("Day %d")
             if day_str not in grouped:
-                grouped[day_str] = {"day": day_str, "heightCm": 15, "ph": p.ph, "temp": p.temperature, "humidity": p.humidity, "water": p.water_level}
+                grouped[day_str] = {"day": day_str, "heightCm": None, "ph": None, "temp": None, "humidity": None, "water": None}
             if r.sensor_type == "ph":
                 grouped[day_str]["ph"] = r.value
             elif r.sensor_type in ["temp", "temperature"]:
@@ -63,12 +66,7 @@ def build_plant_response(p: Plant, db: Session) -> PlantResponse:
                 grouped[day_str]["water"] = r.value
         history = list(grouped.values())
     
-    if not history:
-        history = [
-            {"day": "Day 1", "heightCm": 10, "ph": p.ph, "temp": p.temperature, "humidity": p.humidity, "water": p.water_level},
-            {"day": "Day 5", "heightCm": 18, "ph": p.ph, "temp": p.temperature, "humidity": p.humidity, "water": p.water_level}
-        ]
-
+    server_connection = db.query(PlantServerConnection).filter(PlantServerConnection.plant_id == p.id).first()
     return PlantResponse(
         id=p.id,
         system_id=p.system_id,
@@ -76,16 +74,18 @@ def build_plant_response(p: Plant, db: Session) -> PlantResponse:
         species=p.species,
         location=p.location or "Greenhouse Bay 1",
         image=p.image,
-        status=p.status or "Healthy",
+        status=p.status or "Waiting for data",
         metrics=PlantMetrics(
-            temperature=p.temperature or 24.0,
-            ph=p.ph or 6.2,
-            humidity=p.humidity or 65.0,
-            waterLevel=p.water_level or 90.0
+            temperature=p.temperature,
+            ph=p.ph,
+            humidity=p.humidity,
+            waterLevel=p.water_level,
         ),
         sensors=sensors_dict,
         growthHistory=history,
-        notes=p.notes or ""
+        notes=p.notes or "",
+        serverIp=server_connection.server_ip if server_connection else None,
+        collectionStatus=("collecting" if plant_collector_manager.is_running(p.id) else "stopped") if server_connection else None,
     )
 
 @router.get("", response_model=List[PlantResponse])
@@ -110,6 +110,13 @@ def create_plant(
     db: Session = Depends(get_db),
     current_grower: Grower = Depends(require_current_grower)
 ):
+    normalized_server_url = None
+    if plant_in.server_ip:
+        try:
+            normalized_server_url = normalize_server_url(plant_in.server_ip)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
     sys_obj = ensure_grower_system(current_grower, db)
     system_id = plant_in.system_id or sys_obj.id
 
@@ -121,11 +128,26 @@ def create_plant(
         location=plant_in.location,
         image=plant_in.image,
         notes=plant_in.notes,
-        status="Healthy"
+        status="Waiting for data",
+        temperature=None,
+        ph=None,
+        humidity=None,
+        water_level=None,
     )
     db.add(plant)
     db.commit()
     db.refresh(plant)
+
+    if normalized_server_url:
+        connection = create_server_connection(db, plant, plant_in.server_ip)
+        connection.source_url = normalized_server_url
+        db.add(connection)
+        db.commit()
+        db.refresh(connection)
+        try:
+            plant_collector_manager.start(connection)
+        except OSError:
+            logger.exception("Could not start collector for plant %s", plant.id)
 
     if plant_in.sensors:
         for stype, sdata in plant_in.sensors.items():
@@ -198,6 +220,7 @@ def delete_plant(plant_id: str, db: Session = Depends(get_db), current_grower: G
     plant = db.query(Plant).filter(Plant.id == plant_id, Plant.grower_id == current_grower.id).first()
     if not plant:
         raise HTTPException(status_code=404, detail="Plant not found")
+    plant_collector_manager.stop(plant.id)
     db.delete(plant)
     db.commit()
     export_readable_data(db)

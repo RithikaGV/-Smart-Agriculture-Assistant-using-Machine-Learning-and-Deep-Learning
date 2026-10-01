@@ -11,6 +11,7 @@ export const PlantCard = ({ plant, onEdit }) => {
       case 'Good': return 'badge-good';
       case 'Needs Attention': return 'badge-needs-attention';
       case 'Critical': return 'badge-critical';
+      case 'Waiting for data': return 'badge-disconnected';
       default: return 'badge-good';
     }
   };
@@ -18,7 +19,7 @@ export const PlantCard = ({ plant, onEdit }) => {
   return (
     <div className="glass-card plant-card" onClick={() => navigateToPlantDetail(plant.id)}>
       <div className="plant-card-image-container">
-        <img src={plant.image} alt={plant.name} className="plant-card-img" />
+        <img src={plant.image || ''} alt={plant.name} className="plant-card-img" />
         <div className="plant-card-badge-top">
           <span className={`badge ${getStatusBadgeClass(plant.status)}`}>
             {plant.status}
@@ -34,22 +35,22 @@ export const PlantCard = ({ plant, onEdit }) => {
 
         <div className="plant-card-metrics-row">
           <div className="mini-metric">
-            <span className="mini-metric-value">{plant.metrics.temperature}°C</span>
+            <span className="mini-metric-value">{plant.metrics.temperature == null ? '—' : `${plant.metrics.temperature}°C`}</span>
             <span className="mini-metric-label">Temp</span>
           </div>
 
           <div className="mini-metric">
-            <span className="mini-metric-value">{plant.metrics.ph}</span>
+            <span className="mini-metric-value">{plant.metrics.ph ?? '—'}</span>
             <span className="mini-metric-label">pH</span>
           </div>
 
           <div className="mini-metric">
-            <span className="mini-metric-value">{plant.metrics.humidity}%</span>
+            <span className="mini-metric-value">{plant.metrics.humidity == null ? '—' : `${plant.metrics.humidity}%`}</span>
             <span className="mini-metric-label">Humidity</span>
           </div>
 
           <div className="mini-metric">
-            <span className="mini-metric-value">{plant.metrics.waterLevel}%</span>
+            <span className="mini-metric-value">{plant.metrics.waterLevel == null ? '—' : `${plant.metrics.waterLevel}%`}</span>
             <span className="mini-metric-label">Water</span>
           </div>
         </div>

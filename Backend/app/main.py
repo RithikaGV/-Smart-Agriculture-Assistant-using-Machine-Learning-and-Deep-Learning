@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -13,6 +14,7 @@ from app.api.v1.sensors import router as sensors_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.ml import router as ml_router
+from app.core.plant_collector import plant_collector_manager
 
 # Create DB tables & seed initial data
 Base.metadata.create_all(bind=engine)
@@ -21,9 +23,19 @@ try:
 except Exception as e:
     print(f"Seeding notice: {e}")
 
+@asynccontextmanager
+async def lifespan(_app):
+    plant_collector_manager.start_saved()
+    try:
+        yield
+    finally:
+        plant_collector_manager.stop_all()
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
 # Enable CORS for React frontend

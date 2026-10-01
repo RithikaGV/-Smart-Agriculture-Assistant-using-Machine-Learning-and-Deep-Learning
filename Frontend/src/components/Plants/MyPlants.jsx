@@ -39,7 +39,14 @@ export const MyPlants = () => {
       </div>
 
       <div className="plants-grid">
-        {plants.map((plant) => (
+        {plants.length === 0 ? (
+          <div className="glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1.5rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>No plants added</h2>
+            <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+              Add a plant and connect its department server to begin collecting readings.
+            </p>
+          </div>
+        ) : plants.map((plant) => (
           <PlantCard
             key={plant.id}
             plant={plant}

@@ -63,14 +63,14 @@ class Plant(Base):
     species = Column(String, nullable=False)
     location = Column(String, nullable=True)
     image = Column(Text, nullable=True)
-    status = Column(String, default="Healthy")  # Healthy, Good, Needs Attention, Critical
+    status = Column(String, default="Waiting for data")
     notes = Column(Text, nullable=True)
     
     # Current Metrics
-    temperature = Column(Float, default=24.0)
-    ph = Column(Float, default=6.2)
-    humidity = Column(Float, default=65.0)
-    water_level = Column(Float, default=90.0)
+    temperature = Column(Float, nullable=True)
+    ph = Column(Float, nullable=True)
+    humidity = Column(Float, nullable=True)
+    water_level = Column(Float, nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -79,6 +79,21 @@ class Plant(Base):
     sensors = relationship("Sensor", back_populates="plant", cascade="all, delete-orphan")
     readings = relationship("SensorReading", back_populates="plant", cascade="all, delete-orphan")
     alerts = relationship("Alert", back_populates="plant", cascade="all, delete-orphan")
+    server_connection = relationship("PlantServerConnection", back_populates="plant", uselist=False, cascade="all, delete-orphan")
+
+
+class PlantServerConnection(Base):
+    __tablename__ = "plant_server_connections"
+
+    id = Column(String, primary_key=True, default=lambda: f"server-{uuid.uuid4().hex[:8]}")
+    plant_id = Column(String, ForeignKey("plants.id"), nullable=False, unique=True, index=True)
+    server_ip = Column(String, nullable=False)
+    source_url = Column(Text, nullable=False)
+    raw_csv_path = Column(Text, nullable=False)
+    cleaned_csv_path = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    plant = relationship("Plant", back_populates="server_connection")
 
 
 class Sensor(Base):

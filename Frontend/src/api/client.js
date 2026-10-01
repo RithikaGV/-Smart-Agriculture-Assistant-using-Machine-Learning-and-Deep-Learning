@@ -14,8 +14,9 @@ export const setAuthToken = (token) => {
 
 const request = async (endpoint, options = {}) => {
   const token = getAuthToken();
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const headers = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...options.headers,
   };
 
@@ -108,6 +109,14 @@ export const api = {
   getDashboardStats: () => request("/dashboard/stats"),
 
   // ML Disease Prediction
+  predictDisease: (file) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request("/ml/predict-disease", {
+      method: "POST",
+      body,
+    });
+  },
   predictDiseaseJson: (imageUrl) =>
     request("/ml/predict-disease-json", {
       method: "POST",

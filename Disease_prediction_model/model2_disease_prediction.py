@@ -39,7 +39,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-ML_MODELS_DIR = BASE_DIR / "ml_models"
+ML_MODELS_DIR = Path(__file__).resolve().parent
 
 MODEL_JOBLIB_PATH = ML_MODELS_DIR / "model2_disease_prediction.joblib"
 MODEL_PKL_PATH = ML_MODELS_DIR / "model2_disease_prediction.pkl"

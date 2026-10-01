@@ -1,129 +1,117 @@
 import io
-import random
-from typing import Optional
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+import ipaddress
+import socket
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit
+import httpx
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from PIL import Image
 from app.schemas.schemas import DiseasePredictionResponse
 
 router = APIRouter(prefix="/ml", tags=["ml"])
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
-class UrlPredictRequest(BaseModel):
-    image_url: Optional[str] = None
+class ImageUrlPredictRequest(BaseModel):
+    image_url: str
 
-PRESET_DISEASES = [
-    {
-        "name": "Tomato Early Blight",
-        "scientificName": "Alternaria solani",
-        "confidence": 97.8,
-        "cause": "Caused by fungal pathogen Alternaria solani. Thrives in warm temperatures (24-29°C) with high humidity or leaf wetness.",
-        "preventiveMeasures": [
-            "Apply copper-based or chlorothalonil fungicide sprays at 7-10 day intervals.",
-            "Prune infected lower leaves to restrict fungal spore splash.",
-            "Ensure proper plant spacing and drip irrigation so foliage remains dry.",
-            "Rotate crops with non-solanaceous plants next season."
-        ],
-        "plantType": "Tomato"
-    },
-    {
-        "name": "Foliar Spot Infection Detected",
-        "scientificName": "Suspected Pathogen (Alternaria / Cercospora)",
-        "confidence": 95.4,
-        "cause": "Fungal leaf spot spores active on foliage. Triggered by excessive canopy moisture and humidity levels (>78%).",
-        "preventiveMeasures": [
-            "Apply targeted copper fungicide or bio-fungicide solution.",
-            "Prune affected infected leaves to prevent spore transmission.",
-            "Increase greenhouse ventilation and adjust watering times to morning.",
-            "Monitor soil pH and nutrient conductivity."
-        ],
-        "plantType": "Hydroponic Crop"
-    },
-    {
-        "name": "Corn Common Rust",
-        "scientificName": "Puccinia sorghi",
-        "confidence": 94.2,
-        "cause": "Caused by the fungus Puccinia sorghi. Spores are windborne and infect leaf tissue during cool, moist nights.",
-        "preventiveMeasures": [
-            "Plant resistant hybrid corn seed varieties.",
-            "Apply triazole or strobilurin fungicides if disease spreads.",
-            "Avoid overhead sprinkler irrigation during humid evening periods."
-        ],
-        "plantType": "Corn"
-    },
-    {
-        "name": "Healthy Organic Leaf",
-        "scientificName": "N/A - Non-Pathogenic",
-        "confidence": 99.4,
-        "cause": "No pathogen or metabolic lesion detected. Stomata and chlorophyll structure are in prime condition.",
-        "preventiveMeasures": [
-            "Maintain existing optimal fertigation schedules.",
-            "Continue monitoring water pH between 5.8 and 6.5.",
-            "Inspect leaves weekly for early pest detection."
-        ],
-        "plantType": "Pepper / Tomato / Mixed"
-    }
-]
+
+def validate_image_url(image_url: str) -> None:
+    try:
+        parsed = urlsplit(image_url)
+        hostname = parsed.hostname
+        parsed_port = parsed.port
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Image URL is malformed.") from error
+
+    if parsed.scheme not in {"http", "https"} or not hostname or parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="Image URL must be a valid HTTP or HTTPS URL.")
+
+    try:
+        port = parsed_port or (443 if parsed.scheme == "https" else 80)
+        addresses = {
+            ipaddress.ip_address(result[4][0])
+            for result in socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+        }
+    except (OSError, ValueError) as error:
+        raise HTTPException(status_code=400, detail="Image URL host could not be resolved.") from error
+
+    if not addresses or any(not address.is_global for address in addresses):
+        raise HTTPException(status_code=400, detail="Image URL must resolve to a public host.")
+
+
+async def fetch_image_from_url(image_url: str) -> bytes:
+    validate_image_url(image_url)
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
+            async with client.stream("GET", image_url, headers={"Accept": "image/*"}) as response:
+                if 300 <= response.status_code < 400:
+                    raise HTTPException(status_code=400, detail="Image URL redirects; provide a direct image URL.")
+                if response.status_code >= 400:
+                    raise HTTPException(status_code=502, detail=f"Image URL fetch failed with HTTP {response.status_code}.")
+
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+                if content_type and not content_type.startswith("image/") and content_type != "application/octet-stream":
+                    raise HTTPException(status_code=400, detail="Image URL must point to an image.")
+
+                contents = bytearray()
+                async for chunk in response.aiter_bytes():
+                    contents.extend(chunk)
+                    if len(contents) > MAX_IMAGE_BYTES:
+                        raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller.")
+    except HTTPException:
+        raise
+    except httpx.TimeoutException as error:
+        raise HTTPException(status_code=504, detail="Timed out while fetching image URL.") from error
+    except httpx.HTTPError as error:
+        raise HTTPException(status_code=502, detail="Could not fetch the image URL.") from error
+
+    return bytes(contents)
+
+
+def predict_image(contents: bytes) -> DiseasePredictionResponse:
+    try:
+        image = Image.open(io.BytesIO(contents))
+        image.verify()
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Invalid image: {error}") from error
+
+    try:
+        root_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
+        if str(root_dir) not in sys.path:
+            sys.path.insert(0, str(root_dir))
+        from Disease_prediction_model.model2_disease_prediction import predict_disease as run_model
+
+        prediction = run_model(contents)
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Disease prediction model is unavailable.") from error
+
+    scientific_name = "N/A"
+    cause = prediction["cause"]
+    if "(" in cause and ")" in cause:
+        scientific_name = cause.split("(", 1)[1].split(")", 1)[0].replace("*", "")
+
+    return DiseasePredictionResponse(
+        name=prediction["full_label"],
+        scientificName=scientific_name,
+        confidence=prediction["confidence_pct"],
+        cause=cause,
+        preventiveMeasures=prediction["treatment_measures"],
+        plantType=prediction["crop"]
+    )
+
 
 @router.post("/predict-disease", response_model=DiseasePredictionResponse)
-async def predict_disease(
-    file: Optional[UploadFile] = File(None),
-    image_url: Optional[str] = Form(None)
-):
-    # Process uploaded file or URL
-    if file:
-        try:
-            contents = await file.read()
-            img = Image.open(io.BytesIO(contents))
-            img.verify()
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid image file uploaded: {str(e)}")
-        
-        # Run Model 2 Botanical Vision Classifier
-        try:
-            import sys
-            from pathlib import Path
-            root_dir = Path(__file__).resolve().parent.parent.parent.parent.parent
-            if str(root_dir) not in sys.path:
-                sys.path.insert(0, str(root_dir))
-            from ml_models.model2_disease_prediction import predict_disease as run_model2
-            pred = run_model2(contents)
-            
-            sci_name = "N/A"
-            if "(" in pred["cause"] and ")" in pred["cause"]:
-                sci_name = pred["cause"].split("(")[1].split(")")[0].replace("*", "")
-                
-            return DiseasePredictionResponse(
-                name=f"{pred['crop']} - {pred['disease']}",
-                scientificName=sci_name,
-                confidence=float(pred["confidence"].replace("%", "")),
-                cause=pred["cause"],
-                preventiveMeasures=pred["treatment_measures"],
-                plantType=pred["crop"]
-            )
-        except Exception as model_err:
-            selected = PRESET_DISEASES[1]
-    elif image_url:
-        selected = PRESET_DISEASES[0]
-    else:
-        selected = PRESET_DISEASES[0]
+async def predict_disease(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+    except Exception as error:
+        raise HTTPException(status_code=400, detail="Could not read uploaded image.") from error
+    return predict_image(contents)
 
-    return DiseasePredictionResponse(
-        name=selected["name"],
-        scientificName=selected["scientificName"],
-        confidence=selected["confidence"],
-        cause=selected["cause"],
-        preventiveMeasures=selected["preventiveMeasures"],
-        plantType=selected.get("plantType", "Hydroponic Crop")
-    )
 
 @router.post("/predict-disease-json", response_model=DiseasePredictionResponse)
-def predict_disease_json(req: UrlPredictRequest):
-    selected = PRESET_DISEASES[0]
-    return DiseasePredictionResponse(
-        name=selected["name"],
-        scientificName=selected["scientificName"],
-        confidence=selected["confidence"],
-        cause=selected["cause"],
-        preventiveMeasures=selected["preventiveMeasures"],
-        plantType=selected.get("plantType", "Hydroponic Crop")
-    )
+async def predict_disease_from_url(request: ImageUrlPredictRequest):
+    contents = await fetch_image_from_url(request.image_url)
+    return predict_image(contents)

@@ -5,6 +5,17 @@ from app.models.domain import Base, Grower, Farm, HydroponicSystem, Plant, Senso
 from app.core.security import get_password_hash
 
 logger = logging.getLogger(__name__)
+LEGACY_DEMO_PLANT_IDS = (
+    "plant-1",
+    "plant-2",
+    "plant-3",
+    "plant-ac0e2912",
+    "plant-c4a7005f",
+    "plant-b4446894",
+    "plant-355a6028",
+    "plant-0afeffc1",
+    "plant-f2debd1f",
+)
 
 def seed_db():
     Base.metadata.create_all(bind=engine)
@@ -124,7 +135,7 @@ def seed_db():
                 }
             ]
 
-            for pdata in plants_data:
+            for pdata in ():
                 plant = Plant(
                     id=pdata["id"],
                     grower_id=grower.id,
@@ -196,7 +207,7 @@ def seed_db():
                 }
             ]
 
-            for adata in alerts_data:
+            for adata in ():
                 alert = Alert(
                     id=adata["id"],
                     plant_id=adata["plant_id"],
@@ -215,6 +226,10 @@ def seed_db():
             logger.info("Database seeding completed successfully.")
             from app.db.exporter import export_readable_data
             export_readable_data(db)
+
+        for plant in db.query(Plant).filter(Plant.id.in_(LEGACY_DEMO_PLANT_IDS)).all():
+            db.delete(plant)
+        db.commit()
 
     finally:
         db.close()

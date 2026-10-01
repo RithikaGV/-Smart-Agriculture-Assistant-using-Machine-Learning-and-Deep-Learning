@@ -2,64 +2,141 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models.domain import Sensor, SensorReading, Plant, Alert
+from app.models.domain import Sensor, SensorReading, Plant, Alert, PlantServerConnection
 from app.schemas.schemas import SensorConnectRequest, SensorReadingIngest, SensorReadingResponse
 
 router = APIRouter(prefix="/sensors", tags=["sensors"])
 
-def check_and_create_alerts(plant: Plant, db: Session):
-    # Temperature & Water critical alert
-    if plant.temperature > 32.0 or plant.water_level < 20.0:
-        plant.status = "Critical"
-        existing = db.query(Alert).filter(Alert.plant_id == plant.id, Alert.resolved == False, Alert.severity == "critical").first()
-        if not existing:
-            alert = Alert(
-                plant_id=plant.id,
-                grower_id=plant.grower_id,
-                severity="critical",
-                type="Temperature & Water Level",
-                title=f"High Temperature ({plant.temperature}°C) & Low Water ({plant.water_level}%)",
-                description=f"Temperature has reached {plant.temperature}°C and water level dropped to {plant.water_level}%. High risk of heat stress.",
-                remedy_text="Turn on the evaporative cooling fan and trigger automated pump refill.",
-                remedy_action="COOLING_AND_REFILL",
-                timestamp="Just now"
-            )
-            db.add(alert)
-    # pH Warning
-    elif plant.ph < 5.5 or plant.ph > 7.0:
-        plant.status = "Needs Attention"
-        existing = db.query(Alert).filter(Alert.plant_id == plant.id, Alert.resolved == False, Alert.type == "pH Acidic Level").first()
-        if not existing:
-            alert = Alert(
-                plant_id=plant.id,
-                grower_id=plant.grower_id,
-                severity="warning",
-                type="pH Acidic Level",
-                title=f"Water pH Imbalance (pH {plant.ph})",
-                description=f"pH has moved to {plant.ph}. Ideal range is 5.8 - 6.5 for optimal nutrient absorption.",
-                remedy_text="Add 15ml of Alkali Buffer (pH Up solution) to balance acidity.",
-                remedy_action="ADD_ALKALI",
-                timestamp="Just now"
-            )
-            db.add(alert)
-    elif plant.humidity > 85.0:
-        plant.status = "Needs Attention"
-        existing = db.query(Alert).filter(Alert.plant_id == plant.id, Alert.resolved == False, Alert.type == "Humidity Risk").first()
-        if not existing:
-            alert = Alert(
-                plant_id=plant.id,
-                grower_id=plant.grower_id,
-                severity="warning",
-                type="Humidity Risk",
-                title=f"High Air Humidity ({plant.humidity}%)",
-                description=f"Relative humidity at {plant.humidity}%. Elevated risk of foliar mold.",
-                remedy_text="Activate air circulation de-humidifiers and open ventilation louvers.",
-                remedy_action="ACTIVATE_DEHUMIDIFIER",
-                timestamp="Just now"
-            )
-            db.add(alert)
+METRIC_ALERT_RULES = (
+    {
+        "attribute": "temperature",
+        "type": "Temperature",
+        "label": "Temperature",
+        "unit": "°C",
+        "healthy_min": 18.0,
+        "healthy_max": 26.0,
+        "critical_min": 15.0,
+        "critical_max": 30.0,
+        "legacy_types": ("Temperature & Water Level",),
+        "remedies": {
+            "low": ("Raise the grow-area temperature and check airflow.", "ADJUST_TEMPERATURE"),
+            "high": ("Increase cooling and airflow around the plant.", "ADJUST_TEMPERATURE"),
+        },
+    },
+    {
+        "attribute": "ph",
+        "type": "pH",
+        "label": "Water pH",
+        "unit": "",
+        "healthy_min": 5.5,
+        "healthy_max": 6.5,
+        "critical_min": 5.0,
+        "critical_max": 7.0,
+        "legacy_types": ("pH Acidic Level",),
+        "remedies": {
+            "low": ("Add pH Up in small measured doses and retest.", "ADD_ALKALI"),
+            "high": ("Add pH Down in small measured doses and retest.", "ADD_ACID"),
+        },
+    },
+    {
+        "attribute": "humidity",
+        "type": "Humidity",
+        "label": "Humidity",
+        "unit": "%",
+        "healthy_min": 50.0,
+        "healthy_max": 70.0,
+        "critical_min": 40.0,
+        "critical_max": 80.0,
+        "legacy_types": ("Humidity Risk",),
+        "remedies": {
+            "low": ("Increase humidification and check ventilation settings.", "ACTIVATE_HUMIDIFIER"),
+            "high": ("Improve ventilation or activate dehumidification.", "ACTIVATE_DEHUMIDIFIER"),
+        },
+    },
+    {
+        "attribute": "water_level",
+        "type": "Water Level",
+        "label": "Water level",
+        "unit": "%",
+        "healthy_min": 40.0,
+        "healthy_max": 100.0,
+        "critical_min": 20.0,
+        "critical_max": 100.0,
+        "remedies": {
+            "low": ("Refill the reservoir and verify the pump is operating.", "REFILL_RESERVOIR"),
+            "high": ("Check the reservoir level and recalibrate its sensor.", "CHECK_WATER_SENSOR"),
+        },
+    },
+)
+
+
+def _metric_severity(value: Optional[float], rule: dict) -> Optional[str]:
+    if value is None:
+        return None
+    if value < rule["critical_min"] or value > rule["critical_max"]:
+        return "critical"
+    if value < rule["healthy_min"] or value > rule["healthy_max"]:
+        return "warning"
+    return None
+
+
+def _sync_metric_alert(plant: Plant, db: Session, rule: dict, severity: Optional[str]) -> None:
+    alert_types = (rule["type"], *rule.get("legacy_types", ()))
+    existing_alerts = (
+        db.query(Alert)
+        .filter(
+            Alert.plant_id == plant.id,
+            Alert.resolved == False,
+            Alert.type.in_(alert_types),
+        )
+        .all()
+    )
+
+    if severity is None:
+        for alert in existing_alerts:
+            alert.resolved = True
+        return
+
+    value = getattr(plant, rule["attribute"])
+    direction = "low" if value < rule["healthy_min"] else "high"
+    remedy_text, remedy_action = rule["remedies"][direction]
+    healthy_range = f"{rule['healthy_min']:g}-{rule['healthy_max']:g}{rule['unit']}"
+    title = f"{'Critical' if severity == 'critical' else 'Warning'}: {rule['label']} {direction} ({value:g}{rule['unit']})"
+    description = f"{rule['label']} is {value:g}{rule['unit']}; the healthy range is {healthy_range}."
+
+    if existing_alerts:
+        alert = existing_alerts[0]
+        for duplicate in existing_alerts[1:]:
+            duplicate.resolved = True
     else:
+        alert = Alert(plant_id=plant.id, grower_id=plant.grower_id)
+        db.add(alert)
+
+    alert.severity = severity
+    alert.type = rule["type"]
+    alert.title = title
+    alert.description = description
+    alert.remedy_text = remedy_text
+    alert.remedy_action = remedy_action
+    alert.timestamp = "Just now"
+
+
+def check_and_create_alerts(plant: Plant, db: Session):
+    severities = []
+    for rule in METRIC_ALERT_RULES:
+        severity = _metric_severity(getattr(plant, rule["attribute"]), rule)
+        _sync_metric_alert(plant, db, rule, severity)
+        if severity:
+            severities.append(severity)
+
+    if "critical" in severities:
+        plant.status = "Critical"
+    elif severities:
+        plant.status = "Needs Attention"
+    elif any(getattr(plant, rule["attribute"]) is not None for rule in METRIC_ALERT_RULES):
         plant.status = "Healthy"
+    else:
+        plant.status = "Waiting for data"
 
 @router.post("/connect")
 def connect_sensor(req: SensorConnectRequest, db: Session = Depends(get_db)):
@@ -99,9 +176,23 @@ def connect_sensor(req: SensorConnectRequest, db: Session = Depends(get_db)):
 
 @router.post("/ingest", status_code=status.HTTP_201_CREATED)
 def ingest_sensor_reading(reading: SensorReadingIngest, db: Session = Depends(get_db)):
-    plant = db.query(Plant).filter(Plant.id == reading.plant_id).first()
+    if reading.plant_id:
+        plant = db.query(Plant).filter(Plant.id == reading.plant_id).first()
+    elif reading.server_url:
+        connections = db.query(PlantServerConnection).filter(
+            PlantServerConnection.source_url == reading.server_url
+        ).all()
+        if len(connections) > 1:
+            raise HTTPException(
+                status_code=409,
+                detail="This server is assigned to multiple plants; use the app-managed collector.",
+            )
+        plant = db.query(Plant).filter(Plant.id == connections[0].plant_id).first() if connections else None
+    else:
+        raise HTTPException(status_code=400, detail="Provide a plant ID or a registered server URL.")
+
     if not plant:
-        raise HTTPException(status_code=404, detail="Plant not found")
+        raise HTTPException(status_code=404, detail="No plant is registered with this ID or server URL.")
 
     sensor = None
     if reading.sensor_address:
@@ -131,12 +222,12 @@ def ingest_sensor_reading(reading: SensorReadingIngest, db: Session = Depends(ge
     )
     db.add(db_reading)
 
-    stype = reading.sensor_type.lower()
-    if stype in ["temperature", "temp"]:
+    stype = reading.sensor_type.strip().lower()
+    if stype in ["temperature", "temp", "dht_temp"]:
         plant.temperature = reading.value
-    elif stype in ["ph"]:
+    elif stype == "ph":
         plant.ph = reading.value
-    elif stype in ["humidity"]:
+    elif stype in ["humidity", "dht_humidity"]:
         plant.humidity = reading.value
     elif stype in ["waterlevel", "water_level", "water"]:
         plant.water_level = reading.value

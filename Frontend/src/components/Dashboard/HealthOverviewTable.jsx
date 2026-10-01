@@ -20,6 +20,7 @@ export const HealthOverviewTable = () => {
       case 'Good': return 'badge-good';
       case 'Needs Attention': return 'badge-needs-attention';
       case 'Critical': return 'badge-critical';
+      case 'Waiting for data': return 'badge-disconnected';
       default: return 'badge-good';
     }
   };
@@ -86,7 +87,7 @@ export const HealthOverviewTable = () => {
                 <tr key={plant.id} onClick={() => navigateToPlantDetail(plant.id)}>
                   <td>
                     <div className="plant-cell">
-                      <img src={plant.image} alt={plant.name} className="plant-thumb" />
+                      <img src={plant.image || ''} alt={plant.name} className="plant-thumb" />
                       <div>
                         <div className="plant-cell-name">{plant.name}</div>
                         <div className="plant-cell-species">{plant.species}</div>
@@ -96,29 +97,29 @@ export const HealthOverviewTable = () => {
 
                   <td>
                     <div className="metric-pill">
-                      <Thermometer size={16} color={plant.metrics.temperature > 30 ? 'var(--status-critical)' : 'var(--accent-emerald)'} />
-                      <span style={{ fontWeight: 700 }}>{plant.metrics.temperature}°C</span>
+                      <Thermometer size={16} color={plant.metrics.temperature != null && plant.metrics.temperature > 30 ? 'var(--status-critical)' : 'var(--accent-emerald)'} />
+                      <span style={{ fontWeight: 700 }}>{plant.metrics.temperature == null ? '—' : `${plant.metrics.temperature}°C`}</span>
                     </div>
                   </td>
 
                   <td>
                     <div className="metric-pill">
-                      <Activity size={16} color={plant.metrics.ph < 5.5 || plant.metrics.ph > 7.2 ? 'var(--status-warning)' : 'var(--accent-emerald)'} />
-                      <span style={{ fontWeight: 700 }}>{plant.metrics.ph}</span>
+                      <Activity size={16} color={plant.metrics.ph != null && (plant.metrics.ph < 5.5 || plant.metrics.ph > 7.2) ? 'var(--status-warning)' : 'var(--accent-emerald)'} />
+                      <span style={{ fontWeight: 700 }}>{plant.metrics.ph ?? '—'}</span>
                     </div>
                   </td>
 
                   <td>
                     <div className="metric-pill">
                       <Droplets size={16} color="var(--status-good)" />
-                      <span>{plant.metrics.humidity}%</span>
+                      <span>{plant.metrics.humidity == null ? '—' : `${plant.metrics.humidity}%`}</span>
                     </div>
                   </td>
 
                   <td>
                     <div className="metric-pill">
-                      <Waves size={16} color={plant.metrics.waterLevel < 20 ? 'var(--status-critical)' : 'var(--accent-emerald)'} />
-                      <span>{plant.metrics.waterLevel}%</span>
+                      <Waves size={16} color={plant.metrics.waterLevel != null && plant.metrics.waterLevel < 20 ? 'var(--status-critical)' : 'var(--accent-emerald)'} />
+                      <span>{plant.metrics.waterLevel == null ? '—' : `${plant.metrics.waterLevel}%`}</span>
                     </div>
                   </td>
 

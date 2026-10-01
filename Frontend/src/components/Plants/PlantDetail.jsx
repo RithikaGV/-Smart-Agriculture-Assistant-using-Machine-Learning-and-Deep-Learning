@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AddEditPlantModal } from './AddEditPlantModal';
-import { ArrowLeft, Thermometer, Activity, Droplets, Waves, Battery, Wifi, WifiOff, Edit, Trash2, TrendingUp, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Thermometer, Activity, Droplets, Waves, Server, Edit, Trash2, TrendingUp } from 'lucide-react';
 import './Plants.css';
 
 export const PlantDetail = () => {
@@ -21,54 +21,12 @@ export const PlantDetail = () => {
     );
   }
 
-  // Sensor helper status text formatter matching PDF:
-  // (Not connected, Connected battery low, Connected and battery level good)
-  const getSensorStatusDisplay = (sensor) => {
-    if (!sensor || !sensor.connected) {
-      return {
-        text: 'Not Connected',
-        class: 'badge-disconnected',
-        icon: WifiOff,
-        color: 'var(--status-disconnected)'
-      };
-    }
-    if (sensor.battery < 20) {
-      return {
-        text: `Connected battery low (${sensor.battery}%)`,
-        class: 'badge-warning',
-        icon: Battery,
-        color: 'var(--status-warning)'
-      };
-    }
-    return {
-      text: `Connected and battery level good (${sensor.battery}%)`,
-      class: 'badge-healthy',
-      icon: Wifi,
-      color: 'var(--status-healthy)'
-    };
-  };
-
-  // Helper for telemetry values (shows 'Not Connected' if sensor is disconnected)
-  const renderMetricValue = (sensorKey, value, unit = '') => {
-    const sensor = plant.sensors?.[sensorKey];
-    if (!sensor || !sensor.connected) {
-      return <span style={{ color: 'var(--status-disconnected)', fontWeight: 700 }}>Not Connected</span>;
-    }
-    return <span style={{ fontWeight: 800 }}>{value}{unit}</span>;
-  };
-
-  const tempStatus = getSensorStatusDisplay(plant.sensors?.temperature);
-  const phStatus = getSensorStatusDisplay(plant.sensors?.ph);
-  const waterStatus = getSensorStatusDisplay(plant.sensors?.waterLevel);
-  const humidityStatus = getSensorStatusDisplay(plant.sensors?.humidity);
+  const renderMetricValue = (value, unit = '') => value == null
+    ? <span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Waiting for data</span>
+    : <span style={{ fontWeight: 800 }}>{value}{unit}</span>;
 
   // Growth pattern chart SVG math calculation
-  const history = plant.growthHistory || [
-    { day: "Day 1", heightCm: 10 },
-    { day: "Day 5", heightCm: 18 },
-    { day: "Day 10", heightCm: 28 },
-    { day: "Day 15", heightCm: 38 }
-  ];
+  const history = (plant.growthHistory || []).filter((reading) => Number.isFinite(reading.heightCm));
 
   const maxHeight = Math.max(...history.map(h => h.heightCm), 50);
   const points = history.map((h, index) => {
@@ -121,11 +79,8 @@ export const PlantDetail = () => {
             <span className="form-label"><Thermometer size={18} color="var(--accent-emerald)" /> Temperature</span>
           </div>
           <div style={{ fontSize: '1.75rem' }}>
-            {renderMetricValue('temperature', plant.metrics.temperature, '°C')}
+            {renderMetricValue(plant.metrics.temperature, '°C')}
           </div>
-          <span className={`badge ${tempStatus.class}`} style={{ width: 'fit-content', marginTop: '0.25rem' }}>
-            {tempStatus.text}
-          </span>
         </div>
 
         {/* PH Box */}
@@ -134,11 +89,8 @@ export const PlantDetail = () => {
             <span className="form-label"><Activity size={18} color="var(--accent-emerald)" /> PH</span>
           </div>
           <div style={{ fontSize: '1.75rem' }}>
-            {renderMetricValue('ph', plant.metrics.ph, '')}
+            {renderMetricValue(plant.metrics.ph, '')}
           </div>
-          <span className={`badge ${phStatus.class}`} style={{ width: 'fit-content', marginTop: '0.25rem' }}>
-            {phStatus.text}
-          </span>
         </div>
 
         {/* Humidity Box */}
@@ -147,11 +99,8 @@ export const PlantDetail = () => {
             <span className="form-label"><Droplets size={18} color="var(--status-good)" /> Humidity in air</span>
           </div>
           <div style={{ fontSize: '1.75rem' }}>
-            {renderMetricValue('humidity', plant.metrics.humidity, '%')}
+            {renderMetricValue(plant.metrics.humidity, '%')}
           </div>
-          <span className={`badge ${humidityStatus.class}`} style={{ width: 'fit-content', marginTop: '0.25rem' }}>
-            {humidityStatus.text}
-          </span>
         </div>
 
         {/* Water Level Box */}
@@ -160,11 +109,8 @@ export const PlantDetail = () => {
             <span className="form-label"><Waves size={18} color="var(--status-good)" /> Water Level</span>
           </div>
           <div style={{ fontSize: '1.75rem' }}>
-            {renderMetricValue('waterLevel', plant.metrics.waterLevel, '%')}
+            {renderMetricValue(plant.metrics.waterLevel, '%')}
           </div>
-          <span className={`badge ${waterStatus.class}`} style={{ width: 'fit-content', marginTop: '0.25rem' }}>
-            {waterStatus.text}
-          </span>
         </div>
       </div>
 
@@ -173,48 +119,19 @@ export const PlantDetail = () => {
         {/* Connectivity with the sensors */}
         <div className="glass-card sensor-connectivity-card">
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Wifi size={22} color="var(--accent-emerald)" />
-            Connectivity with the sensors
+            <Server size={22} color="var(--accent-emerald)" />
+            Department server
           </h2>
 
           <div className="sensor-list">
             <div className="sensor-item">
-              <div className="sensor-name-type">
-                <Thermometer size={18} />
-                <span>Temperature sensor</span>
-              </div>
-              <span className={`badge ${tempStatus.class}`}>
-                {tempStatus.text}
-              </span>
+              <span>Server address</span>
+              <span>{plant.serverIp || 'Not configured'}</span>
             </div>
-
             <div className="sensor-item">
-              <div className="sensor-name-type">
-                <Activity size={18} />
-                <span>PH sensor</span>
-              </div>
-              <span className={`badge ${phStatus.class}`}>
-                {phStatus.text}
-              </span>
-            </div>
-
-            <div className="sensor-item">
-              <div className="sensor-name-type">
-                <Waves size={18} />
-                <span>Water level sensor</span>
-              </div>
-              <span className={`badge ${waterStatus.class}`}>
-                {waterStatus.text}
-              </span>
-            </div>
-
-            <div className="sensor-item">
-              <div className="sensor-name-type">
-                <Droplets size={18} />
-                <span>Humidity sensor</span>
-              </div>
-              <span className={`badge ${humidityStatus.class}`}>
-                {humidityStatus.text}
+              <span>Collection</span>
+              <span className={`badge ${plant.collectionStatus === 'collecting' ? 'badge-healthy' : 'badge-warning'}`}>
+                {plant.collectionStatus === 'collecting' ? 'Collecting' : plant.collectionStatus || 'Not connected'}
               </span>
             </div>
           </div>
@@ -231,6 +148,11 @@ export const PlantDetail = () => {
           </p>
 
           <div className="growth-chart-container">
+            {history.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 1rem' }}>
+                Growth measurements are not available from the connected server.
+              </div>
+            ) : (
             <svg viewBox="0 0 580 260" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
               {/* Grid Lines */}
               <line x1="40" y1="40" x2="540" y2="40" stroke="var(--border-color)" strokeDasharray="4 4" />
@@ -276,6 +198,7 @@ export const PlantDetail = () => {
                 );
               })}
             </svg>
+            )}
           </div>
         </div>
       </div>

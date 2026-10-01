@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { INITIAL_GROWER_PROFILE, DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { api, setAuthToken, getAuthToken } from '../api/client';
 
@@ -14,7 +14,7 @@ export const AppProvider = ({ children }) => {
 
   // Active view
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedPlantId, setSelectedPlantId] = useState('plant-1');
+  const [selectedPlantId, setSelectedPlantId] = useState(null);
 
   // Core Data
   const [plants, setPlants] = useState([]);
@@ -22,7 +22,7 @@ export const AppProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
   // Fetch initial data from backend API for current logged-in user
-  const refreshBackendData = async () => {
+  const refreshBackendData = useCallback(async () => {
     try {
       const backendPlants = await api.getPlants();
       if (backendPlants && Array.isArray(backendPlants)) {
@@ -40,7 +40,7 @@ export const AppProvider = ({ children }) => {
     } catch (e) {
       // fallback
     }
-  };
+  }, []);
 
   // Initialize session token on app load
   useEffect(() => {
@@ -64,6 +64,16 @@ export const AppProvider = ({ children }) => {
     };
     initSession();
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+
+    const refreshInterval = window.setInterval(() => {
+      void refreshBackendData();
+    }, 5000);
+
+    return () => window.clearInterval(refreshInterval);
+  }, [isLoggedIn, refreshBackendData]);
 
   // Apply theme class to document element
   useEffect(() => {
@@ -138,20 +148,26 @@ export const AppProvider = ({ children }) => {
       species: newPlantData.species || "General Species",
       location: newPlantData.location || "Greenhouse Bay 1",
       image: plantImage,
-      sensors: newPlantData.sensors,
+      server_ip: newPlantData.server_ip,
       notes: newPlantData.notes || "Newly added plant."
     };
 
     try {
       const created = await api.createPlant(payload);
       if (created) {
-        showToast(`Successfully added "${created.name}"!`);
+        showToast(
+          created.collectionStatus === 'collecting'
+            ? `Added "${created.name}"; server collection started.`
+            : `Added "${created.name}", but its collector did not start.`,
+          created.collectionStatus === 'collecting' ? 'success' : 'warning'
+        );
         await refreshBackendData();
-        return;
+        return created;
       }
     } catch (e) {
       console.error("Failed to add plant to backend", e);
-      showToast("Error adding plant. Please sign in again.", "warning");
+      showToast(e.message || "Unable to add plant. Check the server address and try again.", "warning");
+      return null;
     }
   };
 

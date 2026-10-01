@@ -3,8 +3,8 @@
     "total_growers": 6,
     "total_farms": 6,
     "total_systems": 7,
-    "total_plants": 12,
-    "active_alerts": 2
+    "total_plants": 1,
+    "active_alerts": 0
   },
   "growers": [
     {
@@ -14,7 +14,7 @@
       "address": "Plot 42, Agritech Innovation Hub, Sector 18",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 6
+      "total_plants": 1
     },
     {
       "id": "c4b076a4-c8c1-4912-bf5c-a29e6ba12be8",
@@ -23,7 +23,7 @@
       "address": "Plot 42, Agritech Innovation Hub",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 1
+      "total_plants": 0
     },
     {
       "id": "caca0ddb-5a50-4a96-8513-d104178c73af",
@@ -32,7 +32,7 @@
       "address": "Agritech Innovation Hub",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 2
+      "total_plants": 0
     },
     {
       "id": "ca02f2dc-0bae-4c18-a9c3-090cf7c01bb6",
@@ -41,7 +41,7 @@
       "address": "Agritech Innovation Hub",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 1
+      "total_plants": 0
     },
     {
       "id": "e589f9a4-6d2b-4e0a-ac20-27e48b5e4cf8",
@@ -50,7 +50,7 @@
       "address": "Agritech Innovation Hub",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 1
+      "total_plants": 0
     },
     {
       "id": "7bb5e9f0-7d19-4ce8-94e4-f1e07280a473",
@@ -59,447 +59,28 @@
       "address": "Agritech Innovation Hub",
       "farm_type": "Smart Hydroponics & IoT Greenhouse",
       "total_farms": 1,
-      "total_plants": 1
+      "total_plants": 0
     }
   ],
   "plants": [
     {
-      "id": "plant-1",
+      "id": "plant-1fa20dcb",
       "grower_id": "grower-1",
       "grower_email": "rajesh.kumar@smartagri.org",
       "system_id": "sys-1",
-      "name": "Hydroponic Roma Tomato",
+      "name": "Tomato",
       "species": "Tomato (Solanum lycopersicum)",
       "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
+      "status": "Waiting for data",
       "metrics": {
-        "temperature": "24.5\u00b0C",
-        "ph": "pH 6.3",
-        "humidity": "68.0%",
-        "water_level": "88.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-089A",
-          "connected": true,
-          "battery": "92%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-401X",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-202B",
-          "connected": true,
-          "battery": "15%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-011C",
-          "connected": true,
-          "battery": "94%"
-        }
-      ],
-      "notes": "Optimal nutrient intake. High fruit yield anticipated."
-    },
-    {
-      "id": "plant-2",
-      "grower_id": "grower-1",
-      "grower_email": "rajesh.kumar@smartagri.org",
-      "system_id": "sys-1",
-      "name": "Red Bell Pepper Batch",
-      "species": "Bell Pepper (Capsicum annuum)",
-      "location": "Greenhouse Alpha - Bay 3",
-      "status": "Needs Attention",
-      "metrics": {
-        "temperature": "31.8\u00b0C",
-        "ph": "pH 5.1",
-        "humidity": "78.0%",
-        "water_level": "32.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-112B",
-          "connected": true,
-          "battery": "74%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-109Z",
-          "connected": true,
-          "battery": "65%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-999X",
-          "connected": false,
-          "battery": "0%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-304D",
-          "connected": true,
-          "battery": "81%"
-        }
-      ],
-      "notes": "Temperature rising. Water level sensor disconnected. Requires pH adjustment."
-    },
-    {
-      "id": "plant-3",
-      "grower_id": "grower-1",
-      "grower_email": "rajesh.kumar@smartagri.org",
-      "system_id": "sys-2",
-      "name": "Crisp Butterhead Lettuce",
-      "species": "Lettuce (Lactuca sativa)",
-      "location": "Vertical Farm Tower B",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "21.5\u00b0C",
-        "ph": "pH 6.0",
-        "humidity": "62.0%",
-        "water_level": "94.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-887K",
-          "connected": true,
-          "battery": "96%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-554M",
-          "connected": true,
-          "battery": "91%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-331L",
-          "connected": true,
-          "battery": "89%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-220P",
-          "connected": true,
-          "battery": "93%"
-        }
-      ],
-      "notes": "Exemplary growth under LED spectrum lights."
-    },
-    {
-      "id": "plant-ac0e2912",
-      "grower_id": "c4b076a4-c8c1-4912-bf5c-a29e6ba12be8",
-      "grower_email": "testgrower@smartagri.org",
-      "system_id": "sys-543b4d2b",
-      "name": "Test's Hydroponic Crop",
-      "species": "Tomato (Solanum lycopersicum)",
-      "location": "Bay 1 - Tower A",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
+        "temperature": "None\u00b0C",
+        "ph": "pH None",
+        "humidity": "None%",
+        "water_level": "None%"
       },
       "sensors": [],
-      "notes": "Initial crop initialized for new grower profile."
-    },
-    {
-      "id": "plant-c4a7005f",
-      "grower_id": "caca0ddb-5a50-4a96-8513-d104178c73af",
-      "grower_email": "grower1@smartagri.org",
-      "system_id": "sys-3443c859",
-      "name": "Grower's Hydroponic Crop",
-      "species": "Tomato (Solanum lycopersicum)",
-      "location": "Bay 1 - Tower A",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [],
-      "notes": "Initial crop initialized for new grower profile."
-    },
-    {
-      "id": "plant-b4446894",
-      "grower_id": "ca02f2dc-0bae-4c18-a9c3-090cf7c01bb6",
-      "grower_email": "grower2@smartagri.org",
-      "system_id": "sys-43637d08",
-      "name": "Grower's Hydroponic Crop",
-      "species": "Tomato (Solanum lycopersicum)",
-      "location": "Bay 1 - Tower A",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [],
-      "notes": "Initial crop initialized for new grower profile."
-    },
-    {
-      "id": "plant-355a6028",
-      "grower_id": "caca0ddb-5a50-4a96-8513-d104178c73af",
-      "grower_email": "grower1@smartagri.org",
-      "system_id": "sys-3443c859",
-      "name": "Grower 1 Exclusive Strawberry",
-      "species": "Strawberry",
-      "location": "Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [],
-      "notes": "Newly added hydroponic crop"
-    },
-    {
-      "id": "plant-15893eaa",
-      "grower_id": "grower-1",
-      "grower_email": "rajesh.kumar@smartagri.org",
-      "system_id": "sys-1",
-      "name": "Corn",
-      "species": "Corn (Zea mays)",
-      "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-001X",
-          "connected": true,
-          "battery": "95%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-002Y",
-          "connected": true,
-          "battery": "90%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-003Z",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-004W",
-          "connected": true,
-          "battery": "92%"
-        }
-      ],
-      "notes": "Newly added plant."
-    },
-    {
-      "id": "plant-15e248b3",
-      "grower_id": "grower-1",
-      "grower_email": "rajesh.kumar@smartagri.org",
-      "system_id": "sys-1",
-      "name": "Corn",
-      "species": "Corn (Zea mays)",
-      "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-001X",
-          "connected": true,
-          "battery": "95%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-002Y",
-          "connected": true,
-          "battery": "90%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-003Z",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-004W",
-          "connected": true,
-          "battery": "92%"
-        }
-      ],
-      "notes": "Newly added plant."
-    },
-    {
-      "id": "plant-72020c71",
-      "grower_id": "grower-1",
-      "grower_email": "rajesh.kumar@smartagri.org",
-      "system_id": "sys-1",
-      "name": "Corn",
-      "species": "Corn (Zea mays)",
-      "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-001X",
-          "connected": true,
-          "battery": "95%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-002Y",
-          "connected": true,
-          "battery": "90%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-003Z",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-004W",
-          "connected": true,
-          "battery": "92%"
-        }
-      ],
-      "notes": "Newly added plant."
-    },
-    {
-      "id": "plant-0afeffc1",
-      "grower_id": "e589f9a4-6d2b-4e0a-ac20-27e48b5e4cf8",
-      "grower_email": "rithikagv2006@gmail.com",
-      "system_id": "sys-899d48dd",
-      "name": "Corn",
-      "species": "Corn (Zea mays)",
-      "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-001X",
-          "connected": true,
-          "battery": "95%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-002Y",
-          "connected": true,
-          "battery": "90%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-003Z",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-004W",
-          "connected": true,
-          "battery": "92%"
-        }
-      ],
-      "notes": "Newly added plant."
-    },
-    {
-      "id": "plant-f2debd1f",
-      "grower_id": "7bb5e9f0-7d19-4ce8-94e4-f1e07280a473",
-      "grower_email": "rithikagvstudies@gmail.com",
-      "system_id": "sys-03fbc6aa",
-      "name": "Custom",
-      "species": "Apple",
-      "location": "Greenhouse Alpha - Bay 1",
-      "status": "Healthy",
-      "metrics": {
-        "temperature": "24.0\u00b0C",
-        "ph": "pH 6.2",
-        "humidity": "65.0%",
-        "water_level": "90.0%"
-      },
-      "sensors": [
-        {
-          "type": "temperature",
-          "address": "BLE-TEMP-001X",
-          "connected": true,
-          "battery": "95%"
-        },
-        {
-          "type": "ph",
-          "address": "I2C-PH-002Y",
-          "connected": true,
-          "battery": "90%"
-        },
-        {
-          "type": "waterLevel",
-          "address": "ADC-WTR-003Z",
-          "connected": true,
-          "battery": "88%"
-        },
-        {
-          "type": "humidity",
-          "address": "BLE-HUM-004W",
-          "connected": true,
-          "battery": "92%"
-        }
-      ],
       "notes": "Newly added plant."
     }
   ],
-  "active_alerts": [
-    {
-      "id": "alert-2",
-      "grower_id": "grower-1",
-      "plant_id": "plant-2",
-      "severity": "warning",
-      "title": "Water Acidic (pH 5.1)",
-      "description": "pH has dropped to 5.1 (Ideal Range: 5.8 - 6.5). Nutrient absorption is impaired.",
-      "remedy": "Add 15ml of Alkali Buffer (pH Up solution) to balance acidity back to ~6.2.",
-      "timestamp": "35 minutes ago"
-    },
-    {
-      "id": "alert-4",
-      "grower_id": "grower-1",
-      "plant_id": "plant-2",
-      "severity": "info",
-      "title": "Water Level Sensor Disconnected",
-      "description": "Telemetry offline for address ADC-WTR-999X.",
-      "remedy": "Check physical sensor cable wiring or reconnect sensor module via My Plants setup.",
-      "timestamp": "2 hours ago"
-    }
-  ]
+  "active_alerts": []
 }

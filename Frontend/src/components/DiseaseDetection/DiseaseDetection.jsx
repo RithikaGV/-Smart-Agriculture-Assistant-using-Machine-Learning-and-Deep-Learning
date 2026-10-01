@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Scan, Upload, Sparkles, CheckCircle2, ShieldCheck, AlertCircle, RefreshCw, Cpu, Image as ImageIcon } from 'lucide-react';
+import { Scan, Upload, CheckCircle2, ShieldCheck, AlertCircle, RefreshCw, Cpu, Image as ImageIcon } from 'lucide-react';
+import { api } from '../../api/client';
 import './DiseaseDetection.css';
 
 const DEFAULT_ANALYSIS_IMAGE = "https://images.unsplash.com/photo-1592841200221-a6898f307baa?auto=format&fit=crop&w=800&q=80";
@@ -7,59 +8,60 @@ const DEFAULT_ANALYSIS_IMAGE = "https://images.unsplash.com/photo-1592841200221-
 export const DiseaseDetection = () => {
   const [userImage, setUserImage] = useState(null);
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [analysisInput, setAnalysisInput] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [predictionData, setPredictionData] = useState({
-    name: 'Tomato Early Blight',
-    scientificName: 'Alternaria solani',
-    confidence: 97.8,
-    cause: 'Caused by the fungal pathogen Alternaria solani. Thrives in warm temperatures (24-29°C) accompanied by high humidity, prolonged leaf wetness, or heavy dew.',
-    preventiveMeasures: [
-      'Apply copper-based or chlorothalonil fungicide sprays at 7-10 day intervals.',
-      'Prune and remove infected lower leaves to restrict fungal spore splash.',
-      'Ensure proper plant spacing and drip irrigation so foliage remains dry.',
-      'Rotate crops with non-solanaceous plants next season.'
-    ]
-  });
+  const [errorMessage, setErrorMessage] = useState('');
+  const [predictionData, setPredictionData] = useState(null);
 
-  const runAnalysisOnImage = (imageSrc, isCustom = true) => {
+  const runAnalysis = async (input, requestPrediction) => {
+    setAnalysisInput(input);
     setIsScanning(true);
-    setTimeout(() => {
-      if (isCustom) {
-        setPredictionData({
-          name: 'Foliar Spot Infection Detected',
-          scientificName: 'Suspected Pathogen (Alternaria / Cercospora)',
-          confidence: 95.4,
-          cause: 'Fungal leaf spot spores active on foliage. Triggered by excessive canopy moisture and humidity levels (>78%).',
-          preventiveMeasures: [
-            'Apply targeted copper fungicide or bio-fungicide solution.',
-            'Prune affected infected leaves to prevent spore transmission to adjacent plants.',
-            'Increase greenhouse ventilation and adjust watering times to morning.',
-            'Monitor soil pH and nutrient conductivity.'
-          ]
-        });
-      }
+    setErrorMessage('');
+    try {
+      const prediction = await requestPrediction();
+      setPredictionData({
+        name: prediction.name,
+        scientificName: prediction.scientificName,
+        confidence: prediction.confidence,
+        cause: prediction.cause,
+        preventiveMeasures: prediction.preventiveMeasures,
+      });
+    } catch (error) {
+      setPredictionData(null);
+      setErrorMessage(error.message || 'Disease prediction failed. Please try another image.');
+    } finally {
       setIsScanning(false);
-    }, 1200);
+    }
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      setImageUrlInput('');
       const reader = new FileReader();
       reader.onloadend = () => {
         setUserImage(reader.result);
-        runAnalysisOnImage(reader.result, true);
       };
       reader.readAsDataURL(file);
+      await runAnalysis({ type: 'file', value: file }, () => api.predictDisease(file));
     }
   };
 
-  const handleUrlSubmit = (e) => {
+  const handleUrlSubmit = async (e) => {
     e.preventDefault();
-    if (imageUrlInput.trim() !== '') {
-      setUserImage(imageUrlInput.trim());
-      runAnalysisOnImage(imageUrlInput.trim(), true);
-    }
+    const imageUrl = imageUrlInput.trim();
+    if (!imageUrl) return;
+
+    setUserImage(imageUrl);
+    await runAnalysis({ type: 'url', value: imageUrl }, () => api.predictDiseaseJson(imageUrl));
+  };
+
+  const reanalyze = () => {
+    if (!analysisInput) return;
+    const requestPrediction = analysisInput.type === 'file'
+      ? () => api.predictDisease(analysisInput.value)
+      : () => api.predictDiseaseJson(analysisInput.value);
+    runAnalysis(analysisInput, requestPrediction);
   };
 
   const currentDisplayImage = userImage || DEFAULT_ANALYSIS_IMAGE;
@@ -73,14 +75,14 @@ export const DiseaseDetection = () => {
             AI & Deep Learning Disease Detection
           </h1>
           <p className="page-subtitle">
-            Upload or enter a plant leaf picture to predict diseases, root causes, and preventive treatment measures.
+            Upload a plant leaf picture or enter its image URL to predict diseases, root causes, and preventive treatment measures.
           </p>
         </div>
 
         <div className="glass-card" style={{ padding: '0.65rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <Cpu size={18} color="var(--accent-emerald)" />
           <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Deep Learning Model: ResNet-50 v2 (Active)
+            Botanical Vision Classifier
           </span>
         </div>
       </div>
@@ -91,7 +93,7 @@ export const DiseaseDetection = () => {
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Enter the image</h2>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-              Upload your plant or leaf photo, or provide an image link for instant ML model diagnosis.
+              Upload a plant or leaf photo, or provide a direct image URL for model diagnosis.
             </p>
           </div>
 
@@ -108,14 +110,14 @@ export const DiseaseDetection = () => {
               type="file"
               accept="image/*"
               onChange={handleFileUpload}
+              disabled={isScanning}
               style={{ display: 'none' }}
             />
           </label>
 
-          {/* Image URL Form Option */}
           <form onSubmit={handleUrlSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <label className="form-label" style={{ fontSize: '0.85rem' }}>
-              <ImageIcon size={16} /> Or paste an Image URL:
+              <ImageIcon size={16} /> Or paste an image URL:
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
@@ -124,8 +126,9 @@ export const DiseaseDetection = () => {
                 placeholder="https://example.com/leaf-photo.jpg"
                 value={imageUrlInput}
                 onChange={(e) => setImageUrlInput(e.target.value)}
+                disabled={isScanning}
               />
-              <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
+              <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} disabled={isScanning || !imageUrlInput.trim()}>
                 Analyze URL
               </button>
             </div>
@@ -140,22 +143,24 @@ export const DiseaseDetection = () => {
                 DISEASE PREDICTION
               </span>
               <h2 className="disease-name">
-                {isScanning ? 'Scanning Neural Layers...' : predictionData.name}
+                {isScanning ? 'Analyzing leaf image...' : predictionData?.name || 'Awaiting leaf image'}
               </h2>
               <div className="scientific-name">
-                {isScanning ? 'Extracting biological features...' : predictionData.scientificName}
+                {isScanning ? 'Extracting botanical features...' : predictionData?.scientificName || 'Prediction details will appear here'}
               </div>
             </div>
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={() => runAnalysisOnImage(currentDisplayImage, true)}
-              disabled={isScanning}
+              onClick={reanalyze}
+              disabled={isScanning || !analysisInput}
             >
               <RefreshCw size={14} className={isScanning ? 'spin-icon' : ''} />
               <span>Re-analyze</span>
             </button>
           </div>
+
+          {errorMessage && <div role="alert" className="alert-description">{errorMessage}</div>}
 
           {/* Neural scanning image preview */}
           <div className="neural-scan-box">
@@ -168,13 +173,13 @@ export const DiseaseDetection = () => {
             <div className="confidence-label-row">
               <span>ML Model Prediction Confidence:</span>
               <span style={{ color: 'var(--accent-emerald)' }}>
-                {isScanning ? 'Analyzing...' : `${predictionData.confidence}%`}
+                {isScanning ? 'Analyzing...' : predictionData ? `${predictionData.confidence}%` : '--'}
               </span>
             </div>
             <div className="confidence-bar-outer">
               <div
                 className="confidence-bar-inner"
-                style={{ width: isScanning ? '35%' : `${predictionData.confidence}%` }}
+                style={{ width: isScanning ? '35%' : `${predictionData?.confidence || 0}%` }}
               ></div>
             </div>
           </div>
@@ -185,7 +190,7 @@ export const DiseaseDetection = () => {
               <AlertCircle size={16} /> Cause of the disease:
             </div>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
-              {isScanning ? 'Analyzing pathogen causes...' : predictionData.cause}
+              {isScanning ? 'Analyzing pathogen causes...' : predictionData?.cause || 'Upload a leaf image to see its predicted cause.'}
             </p>
           </div>
 
@@ -199,13 +204,15 @@ export const DiseaseDetection = () => {
             <div className="preventive-list">
               {isScanning ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Computing preventive treatment protocol...</div>
-              ) : (
+              ) : predictionData ? (
                 predictionData.preventiveMeasures.map((measure, index) => (
                   <div key={index} className="preventive-item">
                     <CheckCircle2 size={16} color="var(--accent-emerald)" style={{ marginTop: '0.15rem', flexShrink: 0 }} />
                     <span>{measure}</span>
                   </div>
                 ))
+              ) : (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Treatment measures will appear after analysis.</div>
               )}
             </div>
           </div>

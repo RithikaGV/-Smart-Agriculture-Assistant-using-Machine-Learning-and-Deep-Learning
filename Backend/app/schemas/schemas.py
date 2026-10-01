@@ -114,7 +114,8 @@ class SensorConnectRequest(BaseModel):
     address: str
 
 class SensorReadingIngest(BaseModel):
-    plant_id: str
+    plant_id: Optional[str] = None
+    server_url: Optional[str] = None
     sensor_address: Optional[str] = None
     sensor_type: str  # e.g. temperature, ph, waterLevel, humidity, or custom
     value: float
@@ -135,23 +136,24 @@ class SensorReadingResponse(BaseModel):
 # --- PLANT SCHEMAS ---
 
 class PlantMetrics(BaseModel):
-    temperature: float = 24.0
-    ph: float = 6.2
-    humidity: float = 65.0
-    waterLevel: float = 90.0
+    temperature: Optional[float] = None
+    ph: Optional[float] = None
+    humidity: Optional[float] = None
+    waterLevel: Optional[float] = None
 
 class GrowthHistoryItem(BaseModel):
     day: str
-    heightCm: float
-    ph: float
-    temp: float
-    humidity: float
-    water: float
+    heightCm: Optional[float] = None
+    ph: Optional[float] = None
+    temp: Optional[float] = None
+    humidity: Optional[float] = None
+    water: Optional[float] = None
 
 class PlantCreate(BaseModel):
     system_id: Optional[str] = None
     name: str
     species: str
+    server_ip: Optional[str] = None
     location: Optional[str] = "Greenhouse Alpha - Bay 1"
     image: Optional[str] = None
     notes: Optional[str] = "Newly added hydroponic crop"
@@ -179,6 +181,8 @@ class PlantResponse(BaseModel):
     sensors: Dict[str, Any]
     growthHistory: List[GrowthHistoryItem] = []
     notes: Optional[str] = None
+    serverIp: Optional[str] = None
+    collectionStatus: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -214,10 +218,10 @@ class DashboardStats(BaseModel):
     needsAttentionCount: int
     criticalCount: int
     activeAlertsCount: int
-    avgTemperature: float
-    avgPh: float
-    avgHumidity: float
-    avgWaterLevel: float
+    avgTemperature: Optional[float] = None
+    avgPh: Optional[float] = None
+    avgHumidity: Optional[float] = None
+    avgWaterLevel: Optional[float] = None
 
 # --- ML PREDICTION SCHEMAS ---
 
