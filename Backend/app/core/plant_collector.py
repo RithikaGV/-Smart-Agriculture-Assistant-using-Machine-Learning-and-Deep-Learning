@@ -36,6 +36,9 @@ def normalize_server_url(server_ip: str) -> str:
     except ValueError as error:
         raise ValueError("The server address is invalid.") from error
 
+    if "<" in parsed.netloc or ">" in parsed.netloc:
+        raise ValueError("Enter the server address without angle brackets.")
+
     if parsed.scheme not in {"http", "https"} or not hostname or parsed.username or parsed.password:
         raise ValueError("Enter a valid HTTP or HTTPS server address.")
 

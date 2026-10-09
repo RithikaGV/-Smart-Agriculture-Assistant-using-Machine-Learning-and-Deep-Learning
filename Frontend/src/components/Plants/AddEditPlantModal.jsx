@@ -207,7 +207,7 @@ export const AddEditPlantModal = ({ isOpen, onClose, plantToEdit }) => {
                   required
                 />
                 <small style={{ color: 'var(--text-muted)' }}>
-                  A bare IP uses port 5000 and the /api/data endpoint. Collection starts when the plant is added.
+                  Enter the IP without angle brackets. A bare IP uses port 5000 and /api/data. Collection starts when the plant is added.
                 </small>
               </div>
             )}

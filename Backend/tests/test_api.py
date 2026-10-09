@@ -166,6 +166,20 @@ class TestHydroponicsAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("HTTP or HTTPS", response.json()["detail"])
 
+    def test_plant_rejects_angle_brackets_in_server_address(self):
+        response = client.post(
+            "/api/v1/plants",
+            json={
+                "name": "Bracketed Server Test",
+                "species": "Tomato",
+                "server_ip": "<192.168.100.131>:5000",
+            },
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("without angle brackets", response.json()["detail"])
+
     def test_sensor_ingest_resolves_registered_server_without_plant_id(self):
         server_url = "http://192.168.100.140:5000/api/data"
         with patch("app.api.v1.plants.plant_collector_manager.start"):
